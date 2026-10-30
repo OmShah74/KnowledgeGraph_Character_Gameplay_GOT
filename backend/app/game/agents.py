@@ -77,7 +77,11 @@ def build_context(conn: sqlite3.Connection, *, player: dict[str, Any], character
         "SELECT title, premise, stage, stages, tension FROM plot_threads WHERE player_id=? AND status='active' AND characters LIKE ?",
         (player["id"], f'%"{cid}"%')).fetchall())
     alive_status = world_state.is_alive(character, world_state.state(conn, player["id"], cid), ord_)
+    from . import story
+
+    scene = story.scene_context(conn, thread, cid, player["id"])
     return {
+        "scene": scene,
         "player": player, "character": character, "thread": thread, "ord": ord_, "label": label(ord_),
         "season": from_ord(ord_)[0], "location": loc, "others": others_rel, "profile": prof, "relationship": rel,
         "memories": mems, "news": news, "tom": tom, "heard": heard, "plots": plots, "history": history,
@@ -139,8 +143,27 @@ def _system_prompt(ctx: dict[str, Any]) -> str:
             stages = pl["stages"] or []
             stage = stages[pl["stage"]]["name"] if pl["stage"] < len(stages) else "resolution"
             lines.append(f"- {pl['title']}: {pl['premise']} (current stage: {stage}; tension {pl['tension']:.2f})")
+    sc = ctx.get("scene")
+    if sc:
+        lines += ["", "## The scene happening right now",
+                  f"{sc['title']} — {sc['summary']}"]
+        for e in sc["events"]:
+            lines.append(f"- This scene shows: {e['title']}: {e['description']}")
+        if sc["played"]:
+            lines.append("What has just been said (most recent last):")
+            lines += [f"  {b['speaker_name']}: {b['text']}" for b in sc["played"]]
+        if sc["own_here"]:
+            lines.append("Your own words in this scene (match this voice exactly): " + " | ".join(f"“{t}”" for t in sc["own_here"]))
+        if sc["upcoming_own"]:
+            lines.append("What you were about to say next, had no one interrupted: " + " | ".join(f"“{t}”" for t in sc["upcoming_own"])
+                         + " — stay true to that intent and mood unless the player's words genuinely change your mind.")
+        lines.append("The player has stepped into this moment. Answer as part of the scene, not as a separate conversation.")
+    avg = (c.get("voice") or {}).get("avg_words")
     lines += ["", "## How to act",
               "- Stay completely in character: diction, rhythm, humour, cruelty or kindness exactly as this person would.",
+              f"- Speak like your lines in the show: about {int(avg) if avg else 12} words per line on average; a few sentences at most."
+              " Period-appropriate speech only — no modern idioms, no narration of feelings, no stage directions inside dialogue.",
+              "- Never break the fourth wall, never mention being an AI, a game, a show, seasons or episodes.",
               "- Use your memories and relationships naturally; refer to shared history. Do not recite them.",
               "- You have your own agenda. Pursue your goals, keep secrets you would keep, lie if you would lie.",
               "- React honestly to the dice outcome of the player's attempt (if any).",
@@ -276,6 +299,9 @@ def fallback_decision(conn: sqlite3.Connection, ctx: dict[str, Any]) -> dict[str
                 line = random.choice(r)["sentence"]
         except sqlite3.OperationalError:
             line = None
+    sc = ctx.get("scene")
+    if sc and sc.get("upcoming_own"):
+        line = sc["upcoming_own"][0]  # in a story scene, continue the canon beat
     if not line:
         sig = [s["text"] for s in (c.get("voice") or {}).get("signature_lines", []) if s["ord"] <= ord_]
         if sig:

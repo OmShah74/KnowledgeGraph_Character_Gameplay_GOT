@@ -431,7 +431,7 @@ async def send_message(tid: str, content: str, intent: str = "say", target_id: s
         present_chars = []
         for cid in t["character_ids"]:
             c = world_state.character(conn, cid)
-            if c and world_state.is_alive(c, world_state.state(conn, p["id"], cid), p["ord"]):
+            if c and _alive_for_thread(t, c, world_state.state(conn, p["id"], cid), p["ord"]):
                 present_chars.append(c)
         if not present_chars:
             raise GameError("No one here can answer you any more.")
@@ -463,7 +463,7 @@ async def continue_scene(tid: str) -> dict[str, Any]:
         t = _thread(conn, tid)
         p = _player(conn, t["player_id"])
         present_chars = [c for c in (world_state.character(conn, cid) for cid in t["character_ids"])
-                         if c and world_state.is_alive(c, world_state.state(conn, p["id"], c["id"]), p["ord"])]
+                         if c and _alive_for_thread(t, c, world_state.state(conn, p["id"], c["id"]), p["ord"])]
         if len(present_chars) < 1:
             raise GameError("No one is left in this scene.")
         history = _messages(conn, tid, 30)
@@ -471,6 +471,12 @@ async def continue_scene(tid: str) -> dict[str, Any]:
         last_text = next((m["content"] for m in reversed(history) if m["role"] in ("character", "player")), "")
         responders = agents.choose_responders(conn, present_chars, last_text, None, last_speakers, max_n=1, rng=rng)
     return await _run_responders(tid, p, responders, [c["id"] for c in present_chars], "", "continue", 0, history, t, rng)
+
+
+def _alive_for_thread(t: dict[str, Any], c: dict[str, Any], st: dict[str, Any] | None, ord_: int) -> bool:
+    if t.get("scene_id") and int(t.get("ord") or 0) == ord_:
+        return world_state.is_alive_in_scene(c, st, ord_)
+    return world_state.is_alive(c, st, ord_)
 
 
 def _link_mentions(conn: sqlite3.Connection, p: dict[str, Any], tid: str, content: str, in_thread: list[str]) -> None:

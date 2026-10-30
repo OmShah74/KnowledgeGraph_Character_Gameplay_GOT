@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from . import bootstrap, config, db, snapshots
-from .api import admin, game, graph, llm, wiki, world
+from .api import admin, game, graph, llm, story, wiki, world
 from .game import jobs
 from .game.engine import GameError
 from .llm.router import router as llm_router
@@ -58,7 +58,7 @@ async def perm_error(_: Request, exc: PermissionError):
     return JSONResponse({"detail": str(exc)}, status_code=403)
 
 
-for r in (world.router, llm.router, graph.router, game.router, wiki.router, admin.router):
+for r in (world.router, llm.router, graph.router, game.router, story.router, wiki.router, admin.router):
     app.include_router(r)
 
 

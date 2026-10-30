@@ -195,6 +195,9 @@ def ingest(path: Path, *, min_lines_for_auto_character: int = 8) -> dict[str, An
             [(a, b, s, w) for (a, b, s), w in interactions.items()],
         )
         _write_canon_events(conn)
+        from . import scenes as scene_builder
+
+        n_scenes = scene_builder.build(conn)
         n_mem = _write_canon_memories(conn, rows, interactions)
         n_mem += _write_dyad_memories(conn, rows)
         db.set_meta(conn, "script_ingested", "1")
@@ -205,7 +208,7 @@ def ingest(path: Path, *, min_lines_for_auto_character: int = 8) -> dict[str, An
     return {
         "rows": len(rows), "episodes": len(episode_meta), "speakers": len(speaker_counts),
         "mapped_lines": mapped, "unmapped_lines": len(rows) - mapped,
-        "auto_characters": len(auto_chars), "canon_memories": n_mem, "columns": cols,
+        "auto_characters": len(auto_chars), "canon_memories": n_mem, "scenes": n_scenes, "columns": cols,
     }
 
 

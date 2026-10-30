@@ -192,8 +192,11 @@ def _restore_from(path: Path, preserve: bool) -> None:
 
 
 def _after_restore() -> dict[str, Any]:
+    """Bring a restored database up to the current schema/canon, then mirror it into Neo4j."""
+    from . import bootstrap
     from .graph import store
 
+    bootstrap.run()
     with db.db() as conn:
         return store.sync_to_neo4j(conn, wipe=True)
 

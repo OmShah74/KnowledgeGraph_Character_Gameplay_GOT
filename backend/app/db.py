@@ -430,6 +430,36 @@ CREATE TABLE IF NOT EXISTS jobs (
 );
 CREATE INDEX IF NOT EXISTS ix_jobs_status ON jobs(status, run_after);
 
+-- ---------------------------------------------------------------- story mode
+-- Canon scenes are segmented from the script (location shifts + cast turnover). Each player
+-- experiences them in order; their interventions are recorded in a scene-linked thread.
+CREATE TABLE IF NOT EXISTS canon_scenes (
+    id TEXT PRIMARY KEY,
+    ord INTEGER NOT NULL,
+    idx INTEGER NOT NULL,
+    location_id TEXT,
+    storyline TEXT,
+    title TEXT NOT NULL,
+    summary TEXT NOT NULL DEFAULT '',
+    participants TEXT NOT NULL DEFAULT '[]',
+    extras TEXT NOT NULL DEFAULT '[]',
+    line_start INTEGER NOT NULL,
+    line_end INTEGER NOT NULL,
+    n_lines INTEGER NOT NULL,
+    events TEXT NOT NULL DEFAULT '[]',
+    UNIQUE (ord, idx)
+);
+CREATE INDEX IF NOT EXISTS ix_scenes_ord ON canon_scenes(ord, idx);
+CREATE TABLE IF NOT EXISTS story_progress (
+    player_id TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    scene_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'in_progress',
+    beat_index INTEGER NOT NULL DEFAULT 0,
+    thread_id TEXT,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (player_id, scene_id)
+);
+
 -- ---------------------------------------------------------------- wiki
 CREATE TABLE IF NOT EXISTS wiki_pages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -486,12 +516,27 @@ def connect() -> sqlite3.Connection:
     return conn
 
 
+# Columns added after the first release: (table, column, DDL). Applied idempotently so older
+# databases, snapshots and archives are migrated forward on open.
+MIGRATIONS: list[tuple[str, str, str]] = [
+    ("threads", "scene_id", "ALTER TABLE threads ADD COLUMN scene_id TEXT"),
+]
+
+
+def migrate(conn: sqlite3.Connection) -> None:
+    for table, column, ddl in MIGRATIONS:
+        cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        if cols and column not in cols:
+            conn.execute(ddl)
+
+
 def init_db() -> None:
     global _initialized
     with _init_lock:
         conn = connect()
         try:
             conn.executescript(SCHEMA)
+            migrate(conn)
             conn.commit()
         finally:
             conn.close()
@@ -518,7 +563,7 @@ JSON_FIELDS = {
     "reputation", "inventory", "flags", "character_ids", "meta", "about",
     "participants", "objectives", "reward", "delta", "properties", "goals", "beliefs", "stances",
     "characters", "factions", "stages", "log", "personality", "drives", "personality_drift", "learned", "counters",
-    "affect", "subject_ids", "result",
+    "affect", "subject_ids", "result", "extras", "events",
 }
 
 

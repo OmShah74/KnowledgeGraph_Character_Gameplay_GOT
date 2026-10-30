@@ -134,6 +134,8 @@ export type Check = {
 };
 
 export type MessageMeta = {
+  canon?: boolean;
+  scene_id?: string;
   intent?: string;
   action?: string;
   thought?: string;

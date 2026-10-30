@@ -110,6 +110,15 @@ def is_alive(c: dict[str, Any], st: dict[str, Any] | None, ord_: int) -> bool:
     return True
 
 
+def is_alive_in_scene(c: dict[str, Any], st: dict[str, Any] | None, ord_: int) -> bool:
+    """Inside the scenes of episode `ord_`, characters who die *during* that episode are still alive."""
+    if st and st.get("alive") is not None:
+        return bool(st["alive"])
+    if c.get("death_ord") is not None and c["death_ord"] < ord_:
+        return False
+    return c.get("death_ord") != 0
+
+
 def canon_location(c: dict[str, Any], ord_: int) -> str | None:
     story = resolve_arc(c.get("arcs") or {}, ord_)
     if not story:

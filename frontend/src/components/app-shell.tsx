@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import useSWR from "swr";
 import {
-  BookOpen, Brain, Castle, Crown, Database, Globe, Menu, Network, Settings, Shapes, Swords, Users, X,
+  BookOpen, Brain, Castle, Clapperboard, Crown, Database, Globe, Menu, Network, Settings, Shapes, Swords, Users, X,
 } from "lucide-react";
 import { fetcher } from "@/lib/api";
 import { usePlayer } from "@/lib/player-context";
@@ -16,6 +16,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 const NAV = [
   { href: "/", label: "Realm", icon: Crown },
+  { href: "/story", label: "Story Mode", icon: Clapperboard },
   { href: "/play", label: "Play", icon: Swords },
   { href: "/world", label: "Chronicle", icon: Globe },
   { href: "/characters", label: "Characters", icon: Users },

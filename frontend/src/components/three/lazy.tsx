@@ -20,3 +20,4 @@ export const CharacterStage = dynamic(() => import("./character-stage"), { ssr: 
 export const CourtScene = dynamic(() => import("./character-stage").then((m) => m.CourtScene), { ssr: false, loading: () => <Placeholder label="The court assembles…" height={340} /> });
 export const FateCheck = dynamic(() => import("./fate-check").then((m) => m.FateCheck), { ssr: false });
 export const ArtifactShowcase = dynamic(() => import("./showcase"), { ssr: false, loading: () => <div className="h-full w-full animate-pulse rounded-lg bg-black/20" /> });
+export const StoryStage = dynamic(() => import("../story/story-stage"), { ssr: false, loading: () => <Placeholder label="Setting the scene…" height="100%" /> });

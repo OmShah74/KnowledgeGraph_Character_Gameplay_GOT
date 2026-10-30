@@ -6,7 +6,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
 import { motion } from "motion/react";
-import { Brain, Ear, GitBranch, MessagesSquare, Network, Play, Plus, ScrollText, Trash2, Users } from "lucide-react";
+import { Brain, Clapperboard, Ear, GitBranch, MessagesSquare, Network, Play, Plus, ScrollText, Trash2, Users } from "lucide-react";
 import { api, errorMessage, fetcher } from "@/lib/api";
 import { usePlayer } from "@/lib/player-context";
 import type { Player } from "@/lib/types";
@@ -18,7 +18,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Sigil } from "@/components/heraldry";
+import { Glyph, Sigil } from "@/components/heraldry";
+import { PRESETS } from "@/lib/presets";
 import { Stat } from "@/components/common";
 import { NewGameWizard } from "@/components/new-game-wizard";
 import { ArtifactShowcase, HeroScene } from "@/components/three/lazy";
@@ -40,6 +41,20 @@ export default function Home() {
   const [wizard, setWizard] = useState(false);
   const { data: meta } = useSWR<Meta>("/api/meta", fetcher);
   const { data: players, mutate } = useSWR<Player[]>("/api/players", fetcher);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function quickStart(id: string) {
+    const p = PRESETS.find((x) => x.id === id)!;
+    setBusy(id);
+    try {
+      const pl = await api.post<Player>("/api/players", { name: p.name, background: p.background, allegiance: p.allegiance, season: p.season, episode: p.episode, location_id: p.location_id });
+      setPlayerId(pl.id);
+      router.push("/story");
+    } catch (e) {
+      toast.error(errorMessage(e));
+      setBusy(null);
+    }
+  }
 
   async function remove(p: Player) {
     try {
@@ -68,9 +83,14 @@ export default function Home() {
             and the realm keeps turning whether you are watching or not.
           </motion.p>
           <div className="pointer-events-auto mt-5 flex flex-wrap gap-3">
-            <Button size="lg" onClick={() => setWizard(true)}><Plus className="size-4" /> Begin a new tale</Button>
+            {playerId && players?.some((p) => p.id === playerId) ? (
+              <Button size="lg" onClick={() => router.push("/story")}><Clapperboard className="size-4" /> Continue the story</Button>
+            ) : (
+              <Button size="lg" onClick={() => document.getElementById("journeys")?.scrollIntoView({ behavior: "smooth" })}><Clapperboard className="size-4" /> Play the story</Button>
+            )}
+            <Button size="lg" variant="outline" onClick={() => setWizard(true)}><Plus className="size-4" /> Create your own character</Button>
             {playerId && players?.some((p) => p.id === playerId) && (
-              <Button size="lg" variant="outline" onClick={() => router.push("/play")}><Play className="size-4" /> Continue your tale</Button>
+              <Button size="lg" variant="outline" onClick={() => router.push("/play")}><Play className="size-4" /> Free roam hub</Button>
             )}
           </div>
         </div>
@@ -85,6 +105,24 @@ export default function Home() {
           <Stat label="Playthroughs" value={meta.players} />
         </section>
       )}
+
+      <section id="journeys" className="scroll-mt-20">
+        <div className="mb-1 flex items-center gap-2"><Clapperboard className="size-5 text-primary" /><h2 className="font-display text-2xl text-primary">Begin a journey in one click</h2></div>
+        <p className="mb-4 text-sm text-muted-foreground">Story Mode plays the series scene by scene, across all eight seasons, in 3D. You walk among the cast, speak up whenever you like — typing or by voice — and the story bends to what you do.</p>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {PRESETS.map((p) => (
+            <button key={p.id} onClick={() => void quickStart(p.id)} disabled={!!busy}
+              className="group flex gap-3 rounded-xl border border-border bg-card/60 p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary/60 hover:bg-card disabled:opacity-60">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-black/40"><Glyph name={p.glyph} className="size-6" color="#e8c26a" /></span>
+              <span className="min-w-0">
+                <span className="block font-display text-base group-hover:text-primary">{busy === p.id ? "Riding out…" : p.title}</span>
+                <span className="block text-[11px] text-muted-foreground">S{p.season}E{p.episode} · {p.name}</span>
+                <span className="mt-1 line-clamp-2 block text-xs text-foreground/75">{p.hook}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
 
       <section>
         <div className="mb-4 flex items-end justify-between">
@@ -119,7 +157,8 @@ export default function Home() {
                         <Badge variant="outline">{p.threads} conversations</Badge>
                       </div>
                       <div className="mt-3 flex gap-2">
-                        <Button size="sm" onClick={() => { setPlayerId(p.id); router.push("/play"); }}><Play className="size-3.5" /> Play</Button>
+                        <Button size="sm" onClick={() => { setPlayerId(p.id); router.push("/story"); }}><Clapperboard className="size-3.5" /> Story</Button>
+                        <Button size="sm" variant="outline" onClick={() => { setPlayerId(p.id); router.push("/play"); }}><Play className="size-3.5" /> Hub</Button>
                         <Button size="sm" variant="outline" asChild><Link href={`/world?player=${p.id}`} onClick={() => setPlayerId(p.id)}>Chronicle</Link></Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>

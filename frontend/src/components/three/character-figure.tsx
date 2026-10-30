@@ -167,7 +167,7 @@ function PropInHand({ prop, m }: { prop: TimedAppearance["prop"]; m: Mats }) {
 
 export function CharacterFigure({
   appearance: a, mood = "calm", talking = false, ghost = false, reaction = null, lookAtPointer = true, onClick, name, showName = false,
-  highlight = false, position = [0, 0, 0], rotationY = 0,
+  highlight = false, position = [0, 0, 0], rotationY = 0, walkRef,
 }: {
   appearance: TimedAppearance;
   mood?: string | null;
@@ -181,6 +181,8 @@ export function CharacterFigure({
   highlight?: boolean;
   position?: [number, number, number];
   rotationY?: number;
+  /** 0..1 walking intensity, written every frame by a movement controller (no re-renders). */
+  walkRef?: React.MutableRefObject<number>;
 }) {
   const aKey = JSON.stringify(a);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -195,6 +197,8 @@ export function CharacterFigure({
   const mouth = useRef<THREE.Mesh>(null);
   const browL = useRef<THREE.Mesh>(null);
   const browR = useRef<THREE.Mesh>(null);
+  const legs = useRef<(THREE.Group | null)[]>([]);
+  const knees = useRef<(THREE.Group | null)[]>([]);
   const armL = useRef<THREE.Group>(null);
   const armR = useRef<THREE.Group>(null);
   const foreL = useRef<THREE.Group>(null);
@@ -255,6 +259,23 @@ export function CharacterFigure({
     if (reacting === "nod") headPitch += Math.sin(sinceReact * 6) * 0.25 * Math.max(0, 1 - sinceReact);
     if (mood === "terrified" || mood === "anxious") { rArmX = -1.0; rFore = -1.6; lArmX = -1.0; lFore = -1.6; }
     if (a.seated) { rArmX = -0.6; lArmX = -0.6; }
+    // --- walking gait: legs, knees and counter-swinging arms
+    const walk = a.seated ? 0 : Math.max(0, Math.min(1, walkRef?.current ?? 0));
+    const gait = t * 9;
+    legs.current.forEach((leg, i) => {
+      if (!leg) return;
+      const sgn = i === 0 ? 1 : -1;
+      leg.rotation.x += ((walk > 0.05 ? Math.sin(gait) * 0.55 * walk * sgn : 0) - leg.rotation.x) * k;
+    });
+    knees.current.forEach((knee, i) => {
+      if (!knee) return;
+      const sgn = i === 0 ? 1 : -1;
+      knee.rotation.x += ((walk > 0.05 ? Math.max(0, -Math.sin(gait) * sgn) * 0.8 * walk : 0) - knee.rotation.x) * k;
+    });
+    if (walk > 0.05 && !talking && !reacting) {
+      rArmX = Math.sin(gait) * 0.5 * walk;
+      lArmX = -Math.sin(gait) * 0.5 * walk;
+    }
     lerp(armR.current, "x", rArmX); lerp(armR.current, "z", rArmZ); lerp(foreR.current, "x", rFore);
     lerp(armL.current, "x", lArmX); lerp(armL.current, "z", lArmZ); lerp(foreL.current, "x", lFore);
     // --- head: pointer tracking + saccades + talk nod
@@ -302,10 +323,10 @@ export function CharacterFigure({
         )}
         <group ref={hips} position={[0, 0, 0]}>
           {/* legs */}
-          {[-1, 1].map((side) => (
-            <group key={side} position={[side * 0.09 * build, 0.95, 0]} rotation={[a.seated ? -1.45 : 0, 0, 0]}>
+          {[-1, 1].map((side, li) => (
+            <group key={side} ref={(el) => { if (!a.seated) legs.current[li] = el; }} position={[side * 0.09 * build, 0.95, 0]} rotation={[a.seated ? -1.45 : 0, 0, 0]}>
               <Part geo={G.capsule} m={skirt ? m.cloth : m.leather} p={[0, -0.22, 0]} s={[0.065 * build, 0.17, 0.07 * build]} />
-              <group position={[0, -0.46, 0]} rotation={[a.seated ? 1.45 : 0, 0, 0]}>
+              <group ref={(el) => { if (!a.seated) knees.current[li] = el; }} position={[0, -0.46, 0]} rotation={[a.seated ? 1.45 : 0, 0, 0]}>
                 <Part geo={G.capsule} m={m.boots} p={[0, -0.21, 0]} s={[0.055 * build, 0.17, 0.06 * build]} />
                 <Part geo={G.box} m={m.boots} p={[0, -0.46, 0.05]} s={[0.09, 0.06, 0.2]} />
               </group>
@@ -380,8 +401,8 @@ export function CharacterFigure({
         )}
       </group>
       {(showName || hover) && name && (
-        <DomLabel position={[0, 2.0, 0]} text={name} distanceFactor={3.6} minScale={0.5} maxScale={0.95} zBase={20}
-          className="whitespace-nowrap rounded border border-amber-300/30 bg-black/75 px-1.5 py-px font-display text-[11px] text-amber-100" />
+        <DomLabel position={[0, 2.0, 0]} text={name} distanceFactor={3.6} minScale={0.78} maxScale={1.05} zBase={20}
+          className="whitespace-nowrap rounded border border-amber-300/30 bg-black/75 px-1.5 py-px font-display text-[12px] text-amber-100" />
       )}
     </group>
   );

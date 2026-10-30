@@ -152,6 +152,28 @@ def build(conn: sqlite3.Connection, sync_neo4j: bool = True) -> dict[str, Any]:
             if p in char_ids:
                 edge(p, "PARTICIPATED_IN", e["id"], e["ord"], None)
 
+    # ---------------------------------------------------------- scene graph (story order of the whole series)
+    from ..ingest import scenes as scene_builder
+
+    scene_builder.ensure(conn)
+    prev_scene = None
+    for sc in db.rows_to_dicts(conn.execute("SELECT * FROM canon_scenes ORDER BY ord, idx").fetchall()):
+        node(sc["id"], "Scene", sc["title"], ord=sc["ord"], idx=sc["idx"], n_lines=sc["n_lines"], summary=sc["summary"],
+             extras=sc["extras"])
+        edge(sc["id"], "SCENE_IN", f"ep_{sc['ord']}", sc["ord"], None)
+        if sc["location_id"]:
+            edge(sc["id"], "SET_AT", sc["location_id"], sc["ord"], None)
+        if sc["storyline"]:
+            edge(sc["id"], "ADVANCES", f"story_{sc['storyline']}", sc["ord"], None)
+        for p in sc["participants"]:
+            if p in char_ids:
+                edge(sc["id"], "FEATURES", p, sc["ord"], None)
+        for ev in sc["events"]:
+            edge(sc["id"], "DEPICTS", ev, sc["ord"], None)
+        if prev_scene:
+            edge(prev_scene, "NEXT_SCENE", sc["id"], sc["ord"], None)
+        prev_scene = sc["id"]
+
     # ---------------------------------------------------------- script-derived structure
     for r in conn.execute("SELECT character_id, ord, lines FROM appearances"):
         edge(r["character_id"], "APPEARS_IN", f"ep_{r['ord']}", r["ord"], None, weight=float(r["lines"]))

@@ -6,6 +6,7 @@ from typing import Any
 
 from . import config, db, snapshots
 from .graph import builder, ontology, store
+from .canon import CANON_VERSION
 from .graph.neo4j_store import neo4j_store
 from .ingest import script_loader
 
@@ -33,6 +34,12 @@ def run(force: bool = False) -> dict[str, Any]:
         ontology.seed(conn)
         ingested = db.get_meta(conn, "script_ingested") == "1"
         built = db.get_meta(conn, "graph_built") == "1"
+        canon_stale = ingested and db.get_meta(conn, "canon_version") != CANON_VERSION
+    if canon_stale and config.SCRIPT_PATH.exists():
+        # Canon data was improved since this database was built: archive, then re-derive canon
+        # (player worlds are untouched).
+        out["archived_before_canon_upgrade"] = snapshots.archive_current("pre-canon-upgrade")
+        force = True
     if force or not ingested:
         if config.SCRIPT_PATH.exists():
             out["ingest"] = script_loader.ingest(config.SCRIPT_PATH)
@@ -46,6 +53,12 @@ def run(force: bool = False) -> dict[str, Any]:
             out["graph"] = builder.build(conn, sync_neo4j=True)
         elif neo4j_store.available and (neo4j_store.status().get("nodes") or 0) == 0:
             out["neo4j"] = store.sync_to_neo4j(conn)
+    with db.db() as conn:
+        from .ingest import scenes as scene_builder
+
+        if scene_builder.ensure(conn) and db.get_meta(conn, "graph_built") == "1" and not conn.execute("SELECT 1 FROM kg_nodes WHERE label='Scene' LIMIT 1").fetchone():
+            out["graph"] = builder.build(conn, sync_neo4j=True)
+        db.set_meta(conn, "canon_version", CANON_VERSION)
     snap = snapshots.ensure_initial_snapshot()
     if snap:
         out["initial_snapshot"] = snap
