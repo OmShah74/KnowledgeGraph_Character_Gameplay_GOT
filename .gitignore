@@ -1,0 +1,71 @@
+# ------------------------------------------------------------------
+# User data — NEVER commit. Everything players create lives here:
+# the SQLite world database, snapshots/archives, uploads and the
+# encryption key protecting stored API keys.
+# ------------------------------------------------------------------
+backend/storage/
+**/storage/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+secret.key
+**/uploads/
+**/archives/
+**/snapshots/
+
+# Neo4j data when mounted locally
+neo4j/
+neo4j_data/
+neo4j_logs/
+
+# Secrets & local configuration
+.env
+.env.*
+!.env.example
+*.pem
+
+# ------------------------------------------------------------------
+# Developer & test data
+# ------------------------------------------------------------------
+backend/storage_test_tmp/
+**/got_tests_*/
+.pytest_cache/
+**/.pytest_cache/
+.coverage
+htmlcov/
+coverage/
+*.log
+scratch/
+tmp/
+
+# Optional source material that should not be redistributed
+data/*.pdf
+
+# ------------------------------------------------------------------
+# Tooling
+# ------------------------------------------------------------------
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+build/
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
